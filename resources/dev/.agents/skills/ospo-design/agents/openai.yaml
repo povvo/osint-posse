@@ -1,0 +1,4 @@
+interface:
+  display_name: "ospo-design"
+  short_description: "Apply a silhouette-led ember and mineral design language"
+  default_prompt: "Use $ospo-design to create, adapt, review, and validate an artifact with the Emberglass Nocturne design language."

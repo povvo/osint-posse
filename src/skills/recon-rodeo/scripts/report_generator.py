@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""
+ospo :: report generator
+Strict ICD 203-aligned analytical briefing and findings memo generation.
+Jinja2 templates -> HTML -> optional PDF via WeasyPrint.
+
+Usage:
+    from scripts.report_generator import ReportGenerator
+    rg = ReportGenerator()
+    html = rg.generate_briefing(data)
+    rg.to_pdf(html, "briefing.pdf")
+"""
+
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+try:
+    from jinja2 import Template
+    HAS_JINJA = True
+except ImportError:
+    HAS_JINJA = False
+
+try:
+    from weasyprint import HTML
+    HAS_WEASYPRINT = True
+except ImportError:
+    HAS_WEASYPRINT = False
+
+
+# ICD 203 probability scale
+ICD_203_SCALE = {
+    "almost_no_chance": {"range": "<5%", "label": "Almost no chance"},
+    "very_unlikely": {"range": "5-20%", "label": "Very unlikely"},
+    "unlikely": {"range": "20-45%", "label": "Unlikely"},
+    "roughly_even": {"range": "45-55%", "label": "Roughly even chance"},
+    "likely": {"range": "55-80%", "label": "Likely"},
+    "very_likely": {"range": "80-95%", "label": "Very likely"},
+    "almost_certain": {"range": ">95%", "label": "Almost certain(ly)"},
+}
+
+BRIEFING_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body { font-family: 'Georgia', serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #1a1a1a; line-height: 1.6; }
+        .header { border-bottom: 3px solid #1a1a1a; padding-bottom: 16px; margin-bottom: 24px; }
+        .classification { font-size: 14px; font-weight: bold; text-transform: uppercase; color: #c0392b; letter-spacing: 2px; }
+        .title { font-size: 24px; margin: 8px 0; }
+        .meta { font-size: 12px; color: #666; }
+        .bluf { background: #f8f9fa; border-left: 4px solid #2c3e50; padding: 16px; margin: 24px 0; }
+        .bluf-label { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #2c3e50; }
+        .section { margin: 24px 0; }
+        .section h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+        .fact { color: #1a1a1a; }
+        .assumption { color: #e67e22; font-style: italic; }
+        .judgement { color: #2980b9; }
+        .confidence { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+        .confidence-high { background: #27ae60; color: white; }
+        .confidence-moderate { background: #f39c12; color: white; }
+        .confidence-low { background: #e74c3c; color: white; }
+        .footer { border-top: 1px solid #ddd; margin-top: 40px; padding-top: 16px; font-size: 11px; color: #999; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        th { background: #f8f9fa; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="classification">{{ classification | default('UNCLASSIFIED') }}</div>
+        <h1 class="title">{{ title }}</h1>
+        <div class="meta">
+            Case Reference: {{ case_ref | default('N/A') }} |
+            Date: {{ date }} |
+            Analyst: {{ analyst | default('ospo') }}
+        </div>
+    </div>
+
+    <div class="bluf">
+        <div class="bluf-label">Bottom Line Up Front</div>
+        <p>{{ bluf }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Source Summary Statement</h2>
+        <p>{{ source_summary_statement }}</p>
+    </div>
+
+    {% if facts %}
+    <div class="section">
+        <h2>Key Facts</h2>
+        {% for fact in facts %}
+        <p class="fact">{{ fact }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if assumptions %}
+    <div class="section">
+        <h2>Key Assumptions</h2>
+        {% for assumption in assumptions %}
+        <p class="assumption">{{ assumption }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if judgements %}
+    <div class="section">
+        <h2>Analytical Judgements</h2>
+        {% for j in judgements %}
+        <p class="judgement">
+            <span class="confidence confidence-moderate">{{ j.probability_label }}</span>
+            {{ j.text }}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>Alternatives Considered</h2>
+        {% for alternative in alternatives_considered %}
+        <p>{{ alternative }}</p>
+        {% endfor %}
+    </div>
+
+    {% if intelligence_gaps %}
+    <div class="section">
+        <h2>Intelligence Gaps</h2>
+        {% for gap in intelligence_gaps %}
+        <p>{{ gap }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if recommendations %}
+    <div class="section">
+        <h2>Recommendations</h2>
+        {% for rec in recommendations %}
+        <p>{{ rec }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Generated by ospo report generator | {{ date }} |
+        ICD 203-aligned structure; analytical content supplied by the investigator | {{ classification | default('UNCLASSIFIED') }}
+    </div>
+</body>
+</html>
+"""
+
+FINDINGS_MEMO_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Findings Memo: {{ case_ref }}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #1a1a1a; line-height: 1.5; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 12px; }
+        h1 { font-size: 20px; }
+        .section { margin: 20px 0; }
+        .section h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+        .confirmed { border-left: 3px solid #27ae60; padding-left: 12px; margin: 8px 0; }
+        .unverified { border-left: 3px solid #f39c12; padding-left: 12px; margin: 8px 0; }
+        .limitation { border-left: 3px solid #e74c3c; padding-left: 12px; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Findings Memo</h1>
+        <p>Case: {{ case_ref }} | Date: {{ date }} | Analyst: {{ analyst | default('ospo') }}</p>
+    </div>
+
+    {% if confirmed_findings %}
+    <div class="section">
+        <h2>Confirmed Findings</h2>
+        {% for f in confirmed_findings %}
+        <div class="confirmed">{{ f }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if unverified_leads %}
+    <div class="section">
+        <h2>Unverified Leads</h2>
+        {% for l in unverified_leads %}
+        <div class="unverified">{{ l }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if limitations %}
+    <div class="section">
+        <h2>Scope Limitations</h2>
+        {% for lim in limitations %}
+        <div class="limitation">{{ lim }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</body>
+</html>
+"""
+
+
+class ReportGenerator:
+    """Strict renderer for an ICD 203-aligned analytical report structure."""
+
+    def __init__(self):
+        if not HAS_JINJA:
+            raise ImportError("jinja2 is required: pip install jinja2")
+
+    def generate_briefing(self, data: dict) -> str:
+        """Generate analytical briefing HTML."""
+        data = self.validate_briefing_data(data)
+        data.setdefault("date", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
+        template = Template(BRIEFING_TEMPLATE)
+        return template.render(**data)
+
+    def generate_findings_memo(self, data: dict) -> str:
+        """Generate findings memo HTML."""
+        data = self.validate_findings_data(data)
+        data.setdefault("date", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
+        template = Template(FINDINGS_MEMO_TEMPLATE)
+        return template.render(**data)
+
+    def to_html(self, html: str, filepath: str) -> str:
+        """Save HTML to file."""
+        Path(filepath).write_text(html)
+        return filepath
+
+    def to_pdf(self, html: str, filepath: str) -> Optional[str]:
+        """Convert HTML to PDF via WeasyPrint."""
+        if not HAS_WEASYPRINT:
+            return None
+        HTML(string=html).write_pdf(filepath)
+        return filepath
+
+    @staticmethod
+    def icd_203_scale() -> dict:
+        return ICD_203_SCALE
+
+    @staticmethod
+    def _required_text(data: dict, field: str) -> str:
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"Required field '{field}' must be a non-empty string.")
+        return value.strip()
+
+    @staticmethod
+    def _required_text_list(data: dict, field: str) -> list[str]:
+        value = data.get(field)
+        if (
+            not isinstance(value, list)
+            or not value
+            or any(not isinstance(item, str) or not item.strip() for item in value)
+        ):
+            raise ValueError(
+                f"Required field '{field}' must be a non-empty list of non-empty strings."
+            )
+        return [item.strip() for item in value]
+
+    @classmethod
+    def validate_briefing_data(cls, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise ValueError("Briefing input must be a JSON object.")
+        data = dict(value)
+        for field in ("title", "case_ref", "bluf", "source_summary_statement"):
+            data[field] = cls._required_text(data, field)
+        for field in ("facts", "assumptions", "alternatives_considered", "intelligence_gaps"):
+            data[field] = cls._required_text_list(data, field)
+        judgements = data.get("judgements")
+        if not isinstance(judgements, list) or not judgements:
+            raise ValueError("Required field 'judgements' must be a non-empty list.")
+        validated_judgements = []
+        for index, judgement in enumerate(judgements, start=1):
+            if not isinstance(judgement, dict):
+                raise ValueError(f"Judgement {index} must be an object.")
+            text = judgement.get("text")
+            probability = judgement.get("probability")
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError(f"Judgement {index} requires non-empty text.")
+            if probability not in ICD_203_SCALE:
+                raise ValueError(
+                    f"Judgement {index} probability must be one of: "
+                    + ", ".join(ICD_203_SCALE)
+                )
+            scale = ICD_203_SCALE[probability]
+            validated_judgements.append(
+                {
+                    **judgement,
+                    "text": text.strip(),
+                    "probability": probability,
+                    "probability_label": f"{scale['label']} ({scale['range']})",
+                }
+            )
+        data["judgements"] = validated_judgements
+        return data
+
+    @classmethod
+    def validate_findings_data(cls, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise ValueError("Findings input must be a JSON object.")
+        data = dict(value)
+        data["case_ref"] = cls._required_text(data, "case_ref")
+        data["limitations"] = cls._required_text_list(data, "limitations")
+        confirmed = data.get("confirmed_findings", [])
+        unverified = data.get("unverified_leads", [])
+        if not isinstance(confirmed, list) or not isinstance(unverified, list):
+            raise ValueError("confirmed_findings and unverified_leads must be lists.")
+        if not confirmed and not unverified:
+            raise ValueError(
+                "A findings memo requires at least one confirmed finding or unverified lead."
+            )
+        for field, items in (("confirmed_findings", confirmed), ("unverified_leads", unverified)):
+            if any(not isinstance(item, str) or not item.strip() for item in items):
+                raise ValueError(f"Field '{field}' contains an empty or non-string item.")
+            data[field] = [item.strip() for item in items]
+        return data
+
+
+def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="Report generator")
+    parser.add_argument("input", help="JSON data file for report")
+    parser.add_argument("--type", choices=["briefing", "findings"], default="briefing", help="Report type")
+    parser.add_argument("--html", help="Output HTML file")
+    parser.add_argument("--pdf", help="Output PDF file")
+    args = parser.parse_args()
+    if not args.html and not args.pdf:
+        parser.error("at least one of --html or --pdf is required")
+    try:
+        data = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        if args.type == "briefing":
+            ReportGenerator.validate_briefing_data(data)
+        else:
+            ReportGenerator.validate_findings_data(data)
+        rg = ReportGenerator()
+        html = (
+            rg.generate_briefing(data)
+            if args.type == "briefing"
+            else rg.generate_findings_memo(data)
+        )
+        if args.pdf and not HAS_WEASYPRINT:
+            raise RuntimeError(
+                "PDF output was requested but weasyprint is unavailable; no fallback was claimed."
+            )
+        if args.html:
+            rg.to_html(html, args.html)
+            print(f"HTML written to {args.html}")
+        if args.pdf:
+            rg.to_pdf(html, args.pdf)
+            print(f"PDF written to {args.pdf}")
+        return 0
+    except (OSError, json.JSONDecodeError, ValueError, RuntimeError, ImportError) as exc:
+        print(f"Report generation failed: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

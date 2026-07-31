@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import argparse,csv,json,uuid
+from datetime import datetime,timezone
+from pathlib import Path
+FIELDS=['case_item_id','time_utc','suite','case_id','item','processing_profile','status','export_path','reviewer','notes']
+def now(): return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+def read(p):
+    if not p.exists(): return []
+    with p.open(newline='',encoding='utf-8-sig') as f: return list(csv.DictReader(f))
+def save(p,rows):
+    p.parent.mkdir(parents=True,exist_ok=True)
+    with p.open('w',newline='',encoding='utf-8') as f:
+        w=csv.DictWriter(f,fieldnames=FIELDS,extrasaction='ignore'); w.writeheader(); w.writerows(rows)
+def add(p,a):
+    rows=read(p); row={'case_item_id':str(uuid.uuid4()),'time_utc':now(),'suite':a.suite,'case_id':a.case_id,'item':a.item,'processing_profile':a.processing_profile,'status':a.status,'export_path':a.export_path,'reviewer':a.reviewer,'notes':a.notes}
+    rows.append(row); save(p,rows); return row
+def main():
+    ap=argparse.ArgumentParser(description='Track forensic suite case items, processing profiles, exports, and review status.')
+    ap.add_argument('tracker'); ap.add_argument('--suite',default=''); ap.add_argument('--case-id',default=''); ap.add_argument('--item',required=True); ap.add_argument('--processing-profile',default=''); ap.add_argument('--status',default='pending'); ap.add_argument('--export-path',default=''); ap.add_argument('--reviewer',default=''); ap.add_argument('--notes',default=''); ap.add_argument('--list',action='store_true')
+    a=ap.parse_args(); p=Path(a.tracker)
+    if a.list: print(json.dumps(read(p),indent=2)); return 0
+    print(json.dumps(add(p,a),indent=2)); return 0
+if __name__=='__main__': raise SystemExit(main())
