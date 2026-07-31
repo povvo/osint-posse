@@ -1,0 +1,11 @@
+// Cloudflare Worker — ospo-db
+// Base configuration for local validation. setup.sh generates the
+// deployment configuration with the actual D1 binding.
+{
+  "name": "ospo-db",
+  "main": "worker.js",
+  "compatibility_date": "2025-03-07",
+  "observability": {
+    "enabled": true
+  }
+}

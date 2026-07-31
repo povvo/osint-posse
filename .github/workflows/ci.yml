@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install quality tooling
+        run: python -m pip install ruff==0.16.1 mypy==2.3.0
+      - name: Lint supported Python surfaces
+        run: ruff check ospo tests scripts setup.py
+      - name: Type-check package
+        run: mypy ospo
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package and build tooling
+        run: python -m pip install . build
+      - name: Test package surfaces
+        run: python -m unittest discover -s tests -v
+      - name: Test Recon Rodeo scripts
+        run: python -m unittest discover -s src/skills/recon-rodeo/scripts -p 'test_*.py' -v
+      - name: Smoke-test every supported tool module
+        run: |
+          python - <<'PY'
+          from ospo._workflow import TOOLS, main
+
+          for name in sorted(TOOLS):
+              result = main(["tool", "run", "--standalone", name, "--", "--help"], prog="ospo")
+              if result != 0:
+                  raise SystemExit(f"{name} --help failed with exit code {result}")
+          PY
+      - name: Verify source release gate
+        run: python scripts/verify_release.py --source .
+      - name: Build sdist
+        run: python -m build --sdist
+      - name: Build wheel from sdist
+        run: python -m pip wheel --no-deps --wheel-dir dist dist/*.tar.gz
+      - name: Verify distribution inventory
+        run: python scripts/verify_release.py --dist dist
+      - name: Clean-install CLI smoke test
+        run: |
+          python -m venv /tmp/ospo-smoke
+          /tmp/ospo-smoke/bin/python -m pip install dist/*.whl
+          /tmp/ospo-smoke/bin/ospo --help
+          /tmp/ospo-smoke/bin/ospo doctor
+          /tmp/ospo-smoke/bin/ospo workflow --help
+          /tmp/ospo-smoke/bin/ospo tool list
+          /tmp/ospo-smoke/bin/green-ink doctor
+
+  mcp-build:
+    name: mcp-build (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: ospo-reframe
+            directory: src/tools/recommended/mcp/ospo-reframe
+          - package: ospo-pigeon-profile
+            directory: src/tools/recommended/mcp/ospo-pigeon-profile
+          - package: ospo-db
+            directory: src/tools/recommended/mcp/ospo-db
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Type-check worker
+        run: npm run typecheck
+      - name: Test worker
+        run: npm test --if-present
+      - name: Build Cloudflare worker
+        run: npm run build
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

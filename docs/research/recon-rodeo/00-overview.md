@@ -1,0 +1,14 @@
+# OSINT Methodology
+---
+
+**Universal Methodological Elements**: All OSINT domains share a common foundational structure built on the intelligence cycle (Direction, Collection, Processing, Analysis, Dissemination), hierarchical source evaluation, quality criteria frameworks, and standard report structures. This provides a base template architecture that can be inherited across all domain templates.
+
+**Domain-Specific Variations**: While sharing common foundations, each domain exhibits distinct source hierarchies, analytical frameworks, and quality standards. Geospatial intelligence prioritises satellite imagery and geolocation verification, cryptocurrency investigation emphasises blockchain analysis and wallet clustering, whilst threat intelligence centres on MITRE ATT&CK frameworks and indicator management.
+
+**Professional Community Divergence**: Law enforcement, journalism, corporate due diligence, and academic research communities structure the same investigation types differently. Law enforcement prioritises evidentiary standards and chain of custody, journalism emphasises verification and source protection, corporate focuses on risk assessment and compliance, whilst academic research prioritises reproducibility and ethical review.
+
+**Evidence Quality Spectrum**: Methodology maturity varies significantly. **STRONG evidence** exists for Threat Intelligence (MITRE ATT&CK framework), Geospatial Intelligence (NGA GEOINT Basic Doctrine), and Cryptocurrency Investigation (established blockchain analysis methodologies). **MODERATE evidence** characterises Social Media Intelligence, Digital Forensics, and Financial Intelligence domains. **EMERGING evidence** appears in People Investigation ethics frameworks and Business Intelligence standardisation.
+
+**Template Architecture Requirements**: Based on cross-domain analysis, investigation templates require five universal components: (1) Research Context (role assignment, epistemic stance, domain framing), (2) Task Specification (research questions, search strategy, domain coverage), (3) Quality Criteria (source hierarchy, evidence standards, validation rules), (4) Analytical Framework (synthesis method, contradiction handling, gap identification), and (5) Output Specification (report structure, format, deliverables, metadata).
+
+**Critical Gaps Identified**: Absence of standardised report structures for people investigation, limited published methodology for beneficial ownership investigation outside FATF guidance, sparse academic literature on SOCMINT analytical frameworks, and inconsistent quality criteria across financial intelligence practices.

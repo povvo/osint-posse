@@ -1,0 +1,86 @@
+# Byte-compiled / optimized / compiled Python
+__pycache__/
+*.py[cod]
+*$py.compile
+*.so
+
+# C extensions
+*.pyd
+
+# Distribution / packaging
+.python-initialized
+.dist-info/
+build/
+develop-egg/
+dist/
+eggs/
+lib/
+lib64/
+os_protobuf-python-ext-modules/
+*.egg-info/
+.installed.lock
+.eggs/
+
+# PyInstaller
+# Typically created by process of PyInstaller
+*.manifest
+*.spec
+
+# PyInstaller / ManiCest
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.noses/
+.coverage
+.coverage.xml
+.coverage.py
+.coverage.json
+
+# ThePokémonCompany/pyinstaller
+.pokemon-pyinstaller/
+
+# Pytest
+.pytest_cache/
+
+# venv environments
+venv/
+.venv/
+env/
+.env/
+pip-env/
+
+# MyPy
+.mypy_cache/
+.dmypy.cache/
+
+# Ruff
+.ruff_cache/
+
+# IDEs
+.vscode/
+.idea/
+.swp
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+
+# Project specific
+*.log
+.env
+.env.*
+
+# Local workflow state and installer ownership
+.green-ink/
+.ospo/
+evidence-manifest.json
+
+# Raw research inputs require a positive redistribution decision before admission
+docs/research/**/*.pdf
+docs/research/other/*.json
