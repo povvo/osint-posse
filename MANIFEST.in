@@ -1,0 +1,12 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+recursive-include ospo *.py py.typed README
+recursive-include docs *.md *.csv
+recursive-include src/skills/recon-rodeo *
+recursive-include src/.claude/agents *.md
+recursive-include src/.codex/agents *.toml
+recursive-exclude docs/research *.pdf *.json
+global-exclude *.py[cod]
+global-exclude __pycache__
+global-exclude *:Zone.Identifier

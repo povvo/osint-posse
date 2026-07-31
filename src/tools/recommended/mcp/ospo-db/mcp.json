@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "thinking-toolkit": {
+      "url": "https://server.smithery.ai/elbpr/thinking-toolkit"
+    },
+    "pigeon-superstition-superposition": {
+      "url": "https://server.smithery.ai/elbpr/pigeon-superstition-superposition"
+    },
+    "ospo-db": {
+      "url": "https://ospo-db.<YOUR_SUBDOMAIN>.workers.dev/mcp"
+    }
+  }
+}

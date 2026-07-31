@@ -1,0 +1,3 @@
+Skill data is copied here at build time from src/skills/recon-rodeo/.
+See .github/workflows/release.yml for the copy step.
+This directory is intentionally sparse in source control.

@@ -1,0 +1,161 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "osint-posse"
+version = "0.1.0"
+description = "A governed, local-first OSINT investigation workflow with 56 evidence-gated tasks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "povvo"},
+]
+
+# Core dependencies — always installed
+dependencies = [
+    "requests>=2.31",
+    "httpx>=0.25",
+    "aiohttp>=3.9",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "rich>=13.0",
+    "tqdm>=4.66",
+    "python-dateutil>=2.8",
+    "pytz>=2024.1",
+    "defusedxml>=0.7",
+    "typer>=0.12",
+    "tomli-w>=1.0",
+    "tomli>=2.0; python_version < '3.11'",
+    "questionary>=2.0",
+    "typing_extensions>=4.0",
+]
+
+[project.optional-dependencies]
+# Username enumeration and identity research
+identity = [
+    "sherlock-project",
+    "maigret",
+]
+
+# Social media archiving and content capture
+social = [
+    "yt-dlp",
+    "gallery-dl",
+    "instaloader",
+    "playwright",
+]
+
+# DNS, domain, and infrastructure investigation
+network = [
+    "dnspython>=2.4",
+    "tldextract>=5.0",
+    "ipwhois>=1.2",
+    "whois>=0.9",
+]
+
+# Corporate registry and financial analysis
+corporate = [
+    "edgartools",
+]
+
+# Sanctions screening and fuzzy matching
+sanctions = [
+    "rapidfuzz>=3.0",
+    "jellyfish>=1.0",
+    "nameparser>=1.1",
+]
+
+# Geolocation, mapping, and spatial analysis
+geo = [
+    "geopandas>=0.14",
+    "geopy>=2.4",
+    "folium>=0.15",
+    "pysolar>=0.11",
+    "exifread>=3.0",
+    "shapely>=2.0",
+]
+
+# Natural language processing and entity extraction
+nlp = [
+    "spacy>=3.7",
+    "nltk>=3.8",
+    "scikit-learn>=1.3",
+]
+
+# Network graph analysis and visualisation
+graph = [
+    "networkx>=3.2",
+    "pyvis>=0.3",
+    "matplotlib>=3.8",
+    "plotly>=5.18",
+    "seaborn>=0.13",
+]
+
+# Evidence preservation and web archiving
+archiving = [
+    "waybackpy>=3.0",
+    "warcio>=1.7",
+    "trafilatura>=1.6",
+]
+
+# PDF processing, OCR, and document handling
+documents = [
+    "pdfplumber>=0.10",
+    "pypdf>=3.17",
+    "pytesseract>=0.3",
+    "Pillow>=10.0",
+    "markitdown>=0.1",
+]
+
+# Report generation (HTML/PDF/Word)
+reporting = [
+    "jinja2>=3.1",
+    "weasyprint>=60.0",
+    "docxtpl>=0.16",
+    "markdown>=3.5",
+    "wordcloud>=1.9",
+]
+
+# Record linkage and entity deduplication
+entity_resolution = [
+    "recordlinkage>=0.16",
+]
+
+# Everything
+all = [
+    "osint-posse[identity,social,network,corporate,sanctions,geo,nlp,graph,archiving,documents,reporting,entity_resolution]",
+]
+
+[project.scripts]
+ospo = "ospo.cli:app"
+green-ink = "ospo._workflow:main"
+
+[tool.setuptools.packages.find]
+include = ["ospo*"]
+
+[tool.setuptools.package-data]
+ospo = ["py.typed", "data/**/*", "data/**/**/*", "data/**/**/**/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = ["B904"]
+
+[tool.ruff.lint.per-file-ignores]
+"source_registry.py" = ["E501"]
+"toolkit_matrix.py"  = ["E501"]
+"report_generator.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_return_any = false
