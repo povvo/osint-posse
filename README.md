@@ -1,11 +1,20 @@
 # OSINT Posse
 
-OSINT Posse packages Recon Rodeo: a local-first investigation workflow with six
-phases, 56 evidence-gated tasks, and optional agent definitions for Claude and
-Codex. It helps an operator record scope, sources, decisions, task evidence, and
-analytical uncertainty. It does not establish legal authority, investigative
-correctness, or a chain of custody by becoming installable. Wheels have tried
-less ambitious forms of jurisprudence.
+OSINT Posse is a comprehensive, standardised framework for conducting
+open-source intelligence investigations through a structured six-phase
+lifecycle. It combines 56 evidence-gated tasks with analytical methods including
+Analysis of Competing Hypotheses and the Person, Object, Location, Event data
+model. Procedures cover authority and purpose recording, SHA-256 acquisition
+receipts, negative-search logging, supervisory review, and the controlled use of
+programmatic tools across corporate, geospatial, financial, identity, media, and
+technical domains.
+
+The framework serves as both an operating manual for AI-assisted research and a
+procedural route from raw public data to transparent, defensible intelligence
+products. Its controls record legal and ethical decisions; they do not confer
+legal authority, guarantee investigative correctness, or produce a chain of
+custody merely because the wheel installed successfully. Packaging has limits,
+despite several centuries of administrative optimism.
 
 Status: pre-release. The first intended release is `0.1.0`. No PyPI package,
 GitHub release, or support response window is claimed yet.
